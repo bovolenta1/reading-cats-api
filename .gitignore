@@ -1,0 +1,33 @@
+# --- Go build artifacts ---
+/bin/
+/dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace (se usar)
+go.work
+go.work.sum
+
+# --- SAM artifacts ---
+.aws-sam/
+samconfig.toml
+packaged.yaml
+
+# --- Env files ---
+.env
+.env.*
+!.env.example
+
+# --- Logs / temp / OS ---
+*.log
+tmp/
+.DS_Store
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.iml
