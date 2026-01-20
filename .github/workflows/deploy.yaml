@@ -11,6 +11,7 @@ permissions:
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   STACK_NAME: ${{ vars.STACK_NAME }}
+  SAM_ARTIFACTS_BUCKET: ${{ vars.SAM_ARTIFACTS_BUCKET }}
 
 jobs:
   deploy:
@@ -38,7 +39,7 @@ jobs:
           sam deploy \
             --stack-name "${STACK_NAME}" \
             --region "${AWS_REGION}" \
-            --resolve-s3 \
+            --s3-bucket "${SAM_ARTIFACTS_BUCKET}" \
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset
