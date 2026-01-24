@@ -2,25 +2,37 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+
+	"reading-cats-api/internal/application/user"
+	"reading-cats-api/internal/config"
+	"reading-cats-api/internal/infra/db"
+	infraUser "reading-cats-api/internal/infra/user"
+	"reading-cats-api/internal/presentation/httpapi"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-type Resp struct {
-	Message string `json:"message"`
+var router *httpapi.Router
+
+func init() {
+	ctx := context.Background()
+	cfg := config.Load()
+
+	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		panic(err)
+	}
+
+	repo := infraUser.NewPostgresRepository(pool)
+	uc := user.NewEnsureMeUseCase(repo)
+	meHandler := httpapi.NewMeHandler(uc)
+
+	router = httpapi.NewRouter(meHandler)
 }
 
-func handler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	body, _ := json.Marshal(Resp{Message: "hello world"})
-	return events.APIGatewayV2HTTPResponse{
-		StatusCode: 200,
-		Headers: map[string]string{
-			"content-type": "application/json",
-		},
-		Body: string(body),
-	}, nil
+func handler(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	return router.Route(ctx, event)
 }
 
 func main() {

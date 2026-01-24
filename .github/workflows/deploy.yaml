@@ -8,10 +8,16 @@ permissions:
   id-token: write
   contents: read
 
+# Avoid parallel deploys (important for migrations)
+concurrency:
+  group: reading-cats-api-prod
+  cancel-in-progress: false
+
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   STACK_NAME: ${{ vars.STACK_NAME }}
   SAM_ARTIFACTS_BUCKET: ${{ vars.SAM_ARTIFACTS_BUCKET }}
+  DB_SECRET_ARN: ${{ vars.DB_SECRET_ARN }}
 
 jobs:
   deploy:
@@ -30,6 +36,34 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+
+      # --- DB migrations (before build/deploy) ---
+      - name: Install migrate CLI (postgres)
+        run: |
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Run DB migrations (up) via Secrets Manager
+        run: |
+          if [ -z "$DB_SECRET_ARN" ]; then
+            echo "DB_SECRET_ARN is empty. Create vars.DB_SECRET_ARN with the Secrets Manager ARN."
+            exit 1
+          fi
+
+          DATABASE_URL="$(aws secretsmanager get-secret-value \
+            --secret-id "$DB_SECRET_ARN" \
+            --query SecretString \
+            --output text)"
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "SecretString is empty for $DB_SECRET_ARN"
+            exit 1
+          fi
+
+          # migrate CLI sometimes expects postgres:// instead of postgresql://
+          DB="${DATABASE_URL/postgresql:\/\//postgres:\/\/}"
+
+          migrate -path migrations -database "$DB" up
 
       - name: Build
         run: sam build

@@ -15,15 +15,20 @@ Resources:
       Handler: bootstrap
       CodeUri: .
       Events:
-        HelloApi:
+        Root:
           Type: HttpApi
           Properties:
-            Path: /hello
-            Method: GET
+            Path: /
+            Method: ANY
+        Proxy:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
     Metadata:
       BuildMethod: go1.x
 
 Outputs:
-  ApiUrl:
-    Description: HTTP API endpoint
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/hello"
+  ApiBaseUrl:
+    Description: HTTP API base URL
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
