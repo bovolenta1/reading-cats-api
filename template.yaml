@@ -7,6 +7,11 @@ Globals:
     Timeout: 10
     MemorySize: 128
 
+Parameters:
+  DbSecretArn:
+    Type: String
+    Description: ARN do secret (Secrets Manager) que contém a DATABASE_URL como string
+
 Resources:
   HelloFunction:
     Type: AWS::Serverless::Function
@@ -14,6 +19,9 @@ Resources:
       Runtime: provided.al2023
       Handler: bootstrap
       CodeUri: .
+      Environment:
+        Variables:
+          DATABASE_URL: !Sub "{{resolve:secretsmanager:${DbSecretArn}:SecretString}}"
       Events:
         Root:
           Type: HttpApi

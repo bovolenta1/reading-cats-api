@@ -70,17 +70,23 @@ jobs:
 
       - name: Deploy
         run: |
+          if [ -z "$DB_SECRET_ARN" ]; then
+            echo "DB_SECRET_ARN is empty. Create vars.DB_SECRET_ARN with the Secrets Manager ARN."
+            exit 1
+          fi
+
           sam deploy \
             --stack-name "${STACK_NAME}" \
             --region "${AWS_REGION}" \
             --s3-bucket "${SAM_ARTIFACTS_BUCKET}" \
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
-            --no-fail-on-empty-changeset
+            --no-fail-on-empty-changeset \
+            --parameter-overrides DbSecretArn="${DB_SECRET_ARN}"
 
       - name: Print endpoint
         run: |
           aws cloudformation describe-stacks \
             --stack-name "${STACK_NAME}" \
-            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiBaseUrl'].OutputValue" \
             --output text
