@@ -2,12 +2,17 @@ package main
 
 import (
 	"context"
+	"log"
+	"os"
 
-	"reading-cats-api/internal/application/user"
+	appReading "reading-cats-api/internal/application/reading"
+	appUser "reading-cats-api/internal/application/user"
 	"reading-cats-api/internal/config"
 	"reading-cats-api/internal/infra/db"
+	infraReading "reading-cats-api/internal/infra/reading"
 	infraUser "reading-cats-api/internal/infra/user"
 	"reading-cats-api/internal/presentation/httpapi"
+	httpReading "reading-cats-api/internal/presentation/httpapi"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -16,6 +21,8 @@ import (
 var router *httpapi.Router
 
 func init() {
+	log.SetOutput(os.Stdout)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	ctx := context.Background()
 	cfg := config.Load()
 
@@ -24,11 +31,19 @@ func init() {
 		panic(err)
 	}
 
-	repo := infraUser.NewPostgresRepository(pool)
-	uc := user.NewEnsureMeUseCase(repo)
-	meHandler := httpapi.NewMeHandler(uc)
+	// user/me
+	userRepo := infraUser.NewPostgresRepository(pool)
+	userUC := appUser.NewEnsureMeUseCase(userRepo)
+	meHandler := httpapi.NewMeHandler(userUC)
 
-	router = httpapi.NewRouter(meHandler)
+	// reading/logs
+	readingRepo := infraReading.NewPostgresRepository(pool)
+	readingUC := appReading.NewRegisterReadingUseCase(readingRepo, "America/Sao_Paulo")
+	getReadingProgressUC := appReading.NewGetReadingProgressUseCase(readingRepo, "America/Sao_Paulo")
+	registerReadingHandler := httpReading.NewRegisterReadingHandler(readingUC)
+	getReadingProgressHandler := httpReading.NewGetReadingProgressHandler(getReadingProgressUC)
+
+	router = httpapi.NewRouter(meHandler, registerReadingHandler, getReadingProgressHandler)
 }
 
 func handler(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
