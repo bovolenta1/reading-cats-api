@@ -62,6 +62,8 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /{proxy+}
             Method: ANY
+    Metadata:
+      BuildMethod: go1.x
 
 Outputs:
   ApiBaseUrl:
