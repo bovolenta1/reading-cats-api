@@ -24,7 +24,7 @@ func JSON(status int, body any) events.APIGatewayV2HTTPResponse {
 	}
 }
 
-func ErrorWithEvent(event events.APIGatewayV2HTTPRequest, status int, msg string) events.APIGatewayV2HTTPResponse {
+func Error(event events.APIGatewayV2HTTPRequest, status int, msg string) events.APIGatewayV2HTTPResponse {
 	reqID := event.RequestContext.RequestID
 	method := event.RequestContext.HTTP.Method
 	path := event.RawPath

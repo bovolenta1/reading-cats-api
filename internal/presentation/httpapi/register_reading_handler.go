@@ -21,14 +21,14 @@ func (h *RegisterReadingHandler) Handle(ctx context.Context, event events.APIGat
 	in, err := BuildRegisterReadingInput(event)
 	if err != nil {
 		if err == ErrUnauthorized {
-			return Error(http.StatusUnauthorized, err.Error()), nil
+			return Error(event, http.StatusUnauthorized, err.Error()), nil
 		}
-		return Error(http.StatusBadRequest, err.Error()), nil
+		return Error(event, http.StatusBadRequest, err.Error()), nil
 	}
 
 	out, err := h.uc.Execute(ctx, in)
 	if err != nil {
-		return Error(http.StatusBadRequest, err.Error()), nil
+		return Error(event, http.StatusBadRequest, err.Error()), nil
 	}
 
 	return JSON(http.StatusOK, map[string]any{"progress": out.Progress}), nil

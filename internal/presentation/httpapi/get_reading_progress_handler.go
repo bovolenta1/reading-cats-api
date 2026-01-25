@@ -21,13 +21,13 @@ func NewGetReadingProgressHandler(uc *app.GetReadingProgressUseCase) *GetReading
 func (h *GetReadingProgressHandler) Handle(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	in, err := BuildGetReadingProgressInput(event)
 	if err != nil {
-		return Error(http.StatusUnauthorized, err.Error()), nil
+		return Error(event, http.StatusUnauthorized, err.Error()), nil
 	}
 
 	out, err := h.uc.Execute(ctx, in)
 	if err != nil {
 		log.Printf("reading.progress error request_id=%s err=%v", event.RequestContext.RequestID, err)
-		return Error(http.StatusInternalServerError, "internal error"), nil
+		return Error(event, http.StatusInternalServerError, "internal error"), nil
 	}
 
 	return JSON(http.StatusOK, map[string]any{"progress": out.Progress}), nil

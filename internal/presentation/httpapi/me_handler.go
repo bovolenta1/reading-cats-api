@@ -21,12 +21,12 @@ func (h *MeHandler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReq
 	in, err := BuildEnsureMeInput(event)
 	if err != nil {
 		// 401 se claims faltando, 400 se formato inválido
-		return Error(http.StatusUnauthorized, err.Error()), nil
+		return Error(event, http.StatusUnauthorized, err.Error()), nil
 	}
 
 	me, err := h.uc.Execute(ctx, in)
 	if err != nil {
-		return Error(http.StatusInternalServerError, err.Error()), nil
+		return Error(event, http.StatusInternalServerError, err.Error()), nil
 	}
 
 	return JSON(http.StatusOK, me), nil
