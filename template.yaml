@@ -13,6 +13,33 @@ Parameters:
     Description: ARN do secret (Secrets Manager) que contém a DATABASE_URL como string
 
 Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "https://readingcats.com"
+          - "https://www.readingcats.com"
+        AllowHeaders:
+          - "authorization"
+          - "content-type"
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        MaxAge: 86400
+      Auth:
+        DefaultAuthorizer: CognitoJwt
+        Authorizers:
+          CognitoJwt:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_1fncE0Hog"
+              audience:
+                - "79ib7l4h2k23ltaj4v5dbdaqng"
+
   HelloFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -26,17 +53,17 @@ Resources:
         Root:
           Type: HttpApi
           Properties:
+            ApiId: !Ref HttpApi
             Path: /
             Method: ANY
         Proxy:
           Type: HttpApi
           Properties:
+            ApiId: !Ref HttpApi
             Path: /{proxy+}
             Method: ANY
-    Metadata:
-      BuildMethod: go1.x
 
 Outputs:
   ApiBaseUrl:
     Description: HTTP API base URL
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
