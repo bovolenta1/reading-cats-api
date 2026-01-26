@@ -40,10 +40,12 @@ func init() {
 	readingRepo := infraReading.NewPostgresRepository(pool)
 	readingUC := appReading.NewRegisterReadingUseCase(readingRepo, "America/Sao_Paulo")
 	getReadingProgressUC := appReading.NewGetReadingProgressUseCase(readingRepo, "America/Sao_Paulo")
+	changeGoalUC := appReading.NewChangeGoalUseCase(readingRepo, "America/Sao_Paulo")
 	registerReadingHandler := httpReading.NewRegisterReadingHandler(readingUC)
 	getReadingProgressHandler := httpReading.NewGetReadingProgressHandler(getReadingProgressUC)
+	changeGoalHandler := httpReading.NewChangeGoalHandler(changeGoalUC)
 
-	router = httpapi.NewRouter(meHandler, registerReadingHandler, getReadingProgressHandler)
+	router = httpapi.NewRouter(meHandler, registerReadingHandler, getReadingProgressHandler, changeGoalHandler)
 }
 
 func handler(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {

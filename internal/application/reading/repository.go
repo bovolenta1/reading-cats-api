@@ -32,4 +32,5 @@ type Repository interface {
 	// writes
 	AddPages(ctx context.Context, tx pgx.Tx, subID string, date readingDomain.LocalDate, delta int) (DayRow, error)
 	InsertDay(ctx context.Context, tx pgx.Tx, subID string, date readingDomain.LocalDate, pagesTotal int, streakDays int) (DayRow, error)
+	UpdateGoal(ctx context.Context, subID string, pages readingDomain.Pages, validFrom readingDomain.LocalDate) error
 }

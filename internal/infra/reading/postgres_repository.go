@@ -106,7 +106,14 @@ RETURNING pages_total, streak_days`
 }
 
 func (r *PostgresRepository) GetGoalPagesOrDefault(ctx context.Context, tx pgx.Tx, subID string, def int) (int, error) {
-	q := `SELECT daily_pages FROM reading_goal WHERE user_id=$1`
+	// Get the most recent goal where start_date <= today
+	q := `
+SELECT daily_pages 
+FROM reading_goal 
+WHERE user_id=$1 AND start_date <= now()
+ORDER BY start_date DESC
+LIMIT 1
+`
 	var v int
 	err := tx.QueryRow(ctx, q, subID).Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -139,4 +146,17 @@ WHERE user_id=$1 AND reading_date BETWEEN $2::date AND $3::date`
 		out[readingDomain.LocalDate(d)] = p
 	}
 	return out, rows.Err()
+}
+
+// UpdateGoal inserts a new goal record with start_date = tomorrow
+func (r *PostgresRepository) UpdateGoal(ctx context.Context, subID string, pages readingDomain.Pages, validFrom readingDomain.LocalDate) error {
+	// Insert new goal record with start_date at 00:00 of validFrom date
+	q := `
+INSERT INTO reading_goal (user_id, daily_pages, start_date, created_at)
+VALUES ($1, $2, $3::date::timestamptz, now())
+ON CONFLICT (user_id, start_date) DO UPDATE
+SET daily_pages = $2
+`
+	_, err := r.pool.Exec(ctx, q, subID, int(pages), validFrom.String())
+	return err
 }
