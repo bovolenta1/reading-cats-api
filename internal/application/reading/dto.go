@@ -19,5 +19,7 @@ type GetReadingProgressInput struct {
 }
 
 type GetReadingProgressOutput struct {
-	Progress readingDomain.ReadingProgress
+	Progress    readingDomain.ReadingProgress `json:"progress"`
+	CurrentGoal *GoalRecord                   `json:"current_goal"`
+	NextGoal    *GoalRecord                   `json:"next_goal,omitempty"`
 }

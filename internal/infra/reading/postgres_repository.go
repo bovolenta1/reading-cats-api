@@ -105,26 +105,6 @@ RETURNING pages_total, streak_days`
 	return app.DayRow{}, err
 }
 
-func (r *PostgresRepository) GetGoalPagesOrDefault(ctx context.Context, tx pgx.Tx, subID string, def int) (int, error) {
-	// Get the most recent goal where start_date <= today
-	q := `
-SELECT daily_pages 
-FROM reading_goal 
-WHERE user_id=$1 AND start_date <= now()
-ORDER BY start_date DESC
-LIMIT 1
-`
-	var v int
-	err := tx.QueryRow(ctx, q, subID).Scan(&v)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return def, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	return v, nil
-}
-
 func (r *PostgresRepository) GetDaysBetween(ctx context.Context, tx pgx.Tx, subID string, start, end readingDomain.LocalDate) (map[readingDomain.LocalDate]int, error) {
 	q := `
 SELECT reading_date::text, pages_total
@@ -148,15 +128,62 @@ WHERE user_id=$1 AND reading_date BETWEEN $2::date AND $3::date`
 	return out, rows.Err()
 }
 
-// UpdateGoal inserts a new goal record with start_date = tomorrow
-func (r *PostgresRepository) UpdateGoal(ctx context.Context, subID string, pages readingDomain.Pages, validFrom readingDomain.LocalDate) error {
-	// Insert new goal record with start_date at 00:00 of validFrom date
+// GetCurrentGoal retorna o goal vigente (start_date <= agora) ou nil se não existe
+func (r *PostgresRepository) GetCurrentGoal(ctx context.Context, tx pgx.Tx, subID string) (int, bool, error) {
+	q := `
+SELECT daily_pages 
+FROM reading_goal 
+WHERE user_id=$1 AND start_date <= now()
+ORDER BY start_date DESC
+LIMIT 1
+`
+	var pages int
+	err := tx.QueryRow(ctx, q, subID).Scan(&pages)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return pages, true, nil
+}
+
+// GetNextGoal retorna o goal para uma data futura ou nil se não existe
+func (r *PostgresRepository) GetNextGoal(ctx context.Context, tx pgx.Tx, subID string, date readingDomain.LocalDate) (int, bool, error) {
+	q := `
+SELECT daily_pages 
+FROM reading_goal 
+WHERE user_id=$1 AND start_date::date = $2::date
+LIMIT 1
+`
+	var pages int
+	err := tx.QueryRow(ctx, q, subID, date.String()).Scan(&pages)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return pages, true, nil
+}
+
+// InsertGoal inserts a new goal record
+func (r *PostgresRepository) InsertGoal(ctx context.Context, tx pgx.Tx, subID string, pages int, startDate readingDomain.LocalDate) error {
 	q := `
 INSERT INTO reading_goal (user_id, daily_pages, start_date, created_at)
-VALUES ($1, $2, $3::date::timestamptz, now())
-ON CONFLICT (user_id, start_date) DO UPDATE
-SET daily_pages = $2
+VALUES ($1, $2, $3::date, now())
 `
-	_, err := r.pool.Exec(ctx, q, subID, int(pages), validFrom.String())
+	_, err := tx.Exec(ctx, q, subID, pages, startDate.String())
+	return err
+}
+
+// UpdateGoalPages updates the pages for a specific goal date
+func (r *PostgresRepository) UpdateGoalPages(ctx context.Context, tx pgx.Tx, subID string, pages int, startDate readingDomain.LocalDate) error {
+	q := `
+UPDATE reading_goal
+SET daily_pages = $1
+WHERE user_id = $2 AND start_date::date = $3::date
+`
+	_, err := tx.Exec(ctx, q, pages, subID, startDate.String())
 	return err
 }

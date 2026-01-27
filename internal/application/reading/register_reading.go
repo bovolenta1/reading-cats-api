@@ -80,9 +80,12 @@ func (uc *RegisterReadingUseCase) Execute(ctx context.Context, in RegisterReadin
 			}
 		}
 
-		goal, err := uc.repo.GetGoalPagesOrDefault(ctx, tx, subID, uc.goalDefault)
+		goal, hasGoal, err := uc.repo.GetCurrentGoal(ctx, tx, subID)
 		if err != nil {
 			return err
+		}
+		if !hasGoal {
+			goal = uc.goalDefault
 		}
 
 		start := targetDate.AddDays(-6)

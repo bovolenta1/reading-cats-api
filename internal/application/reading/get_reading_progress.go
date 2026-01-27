@@ -54,12 +54,21 @@ func (uc *GetReadingProgressUseCase) Execute(ctx context.Context, in GetReadingP
 			return err
 		}
 
-		goal, err := uc.repo.GetGoalPagesOrDefault(ctx, tx, sub, uc.goalDefault)
+		goal, hasGoal, err := uc.repo.GetCurrentGoal(ctx, tx, sub)
 		if err != nil {
 			return err
 		}
+		if !hasGoal {
+			goal = uc.goalDefault
+		}
 
-		// streak pra snapshot:
+		currentGoal := &GoalRecord{
+			DailyPages: goal,
+			ValidFrom:  targetDate.String(),
+		}
+
+		nextGoal := uc.buildNextGoal(ctx, tx, sub, realDate, goal)
+
 		streak := 0
 		pagesToday := 0
 
@@ -105,10 +114,29 @@ func (uc *GetReadingProgressUseCase) Execute(ctx context.Context, in GetReadingP
 				},
 				Week: week,
 			},
+			CurrentGoal: currentGoal,
+			NextGoal:    nextGoal,
 		}
 
 		return nil
 	})
 
 	return out, err
+}
+
+func (uc *GetReadingProgressUseCase) buildNextGoal(ctx context.Context, tx pgx.Tx, sub string, targetDate readingDomain.LocalDate, currentGoalPages int) *GoalRecord {
+	nextDate := targetDate.AddDays(1)
+	nextGoalPages, hasNextGoal, _ := uc.repo.GetNextGoal(ctx, tx, sub, nextDate)
+	if !hasNextGoal {
+		nextGoalPages = uc.goalDefault
+	}
+
+	if nextGoalPages != currentGoalPages {
+		return &GoalRecord{
+			DailyPages: nextGoalPages,
+			ValidFrom:  nextDate.String(),
+		}
+	}
+
+	return nil
 }

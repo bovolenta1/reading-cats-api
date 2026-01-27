@@ -29,25 +29,49 @@ func (uc *ChangeGoalUseCase) Execute(ctx context.Context, in ChangeGoalInput) (C
 
 	now := time.Now().In(loc)
 	today := readingDomain.DateOf(now, loc)
-	nextDay := today.AddDays(1)
+	tomorrow := today.AddDays(1)
 
 	var currentGoal *GoalRecord
 	var nextGoal *GoalRecord
 
 	err = uc.repo.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		goalPages, _ := uc.repo.GetGoalPagesOrDefault(ctx, tx, in.CognitoSub, 5)
-		currentGoal = &GoalRecord{
-			DailyPages: goalPages,
-			ValidFrom:  today.String(),
-		}
-
-		if err := uc.repo.UpdateGoal(ctx, in.CognitoSub, in.Pages, nextDay); err != nil {
+		currentPages, hasCurrentGoal, err := uc.repo.GetCurrentGoal(ctx, tx, in.CognitoSub)
+		if err != nil {
 			return err
 		}
 
+		if !hasCurrentGoal {
+			if err := uc.repo.InsertGoal(ctx, tx, in.CognitoSub, 5, today); err != nil {
+				return err
+			}
+			currentPages = 5
+		}
+
+		currentGoal = &GoalRecord{
+			DailyPages: currentPages,
+			ValidFrom:  today.String(),
+		}
+
+		nextPages, hasNextGoal, err := uc.repo.GetNextGoal(ctx, tx, in.CognitoSub, tomorrow)
+		if err != nil {
+			return err
+		}
+
+		if !hasNextGoal {
+			if err := uc.repo.InsertGoal(ctx, tx, in.CognitoSub, int(in.Pages), tomorrow); err != nil {
+				return err
+			}
+			nextPages = int(in.Pages)
+		} else if nextPages != int(in.Pages) {
+			if err := uc.repo.UpdateGoalPages(ctx, tx, in.CognitoSub, int(in.Pages), tomorrow); err != nil {
+				return err
+			}
+			nextPages = int(in.Pages)
+		}
+
 		nextGoal = &GoalRecord{
-			DailyPages: int(in.Pages),
-			ValidFrom:  nextDay.String(),
+			DailyPages: nextPages,
+			ValidFrom:  tomorrow.String(),
 		}
 
 		return nil

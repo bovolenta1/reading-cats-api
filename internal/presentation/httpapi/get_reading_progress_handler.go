@@ -30,5 +30,5 @@ func (h *GetReadingProgressHandler) Handle(ctx context.Context, event events.API
 		return Error(event, http.StatusInternalServerError, "internal error"), nil
 	}
 
-	return JSON(http.StatusOK, map[string]any{"progress": out.Progress}), nil
+	return JSON(http.StatusOK, out), nil
 }
