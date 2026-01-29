@@ -128,7 +128,7 @@ func (uc *GetReadingProgressUseCase) buildNextGoal(ctx context.Context, tx pgx.T
 	nextDate := targetDate.AddDays(1)
 	nextGoalPages, hasNextGoal, _ := uc.repo.GetNextGoal(ctx, tx, sub, nextDate)
 	if !hasNextGoal {
-		nextGoalPages = uc.goalDefault
+		nextGoalPages = 0
 	}
 
 	if nextGoalPages != currentGoalPages {
