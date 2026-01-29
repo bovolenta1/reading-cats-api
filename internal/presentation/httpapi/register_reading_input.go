@@ -12,34 +12,30 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 )
 
-type body struct {
+type registerReadingBody struct {
 	Pages int `json:"pages"`
 }
 
 func BuildRegisterReadingInput(event events.APIGatewayV2HTTPRequest) (app.RegisterReadingInput, error) {
-	// reaproveita claims do core httpapi
-	meIn, err := BuildEnsureMeInput(event)
+	// Extract Claims from event
+	claims, err := ExtractClaims(event)
 	if err != nil {
 		return app.RegisterReadingInput{}, err
 	}
 
-	raw, err := readBody(event)
-	if err != nil {
-		return app.RegisterReadingInput{}, err
+	// Parse body
+	var body registerReadingBody
+	if err := json.Unmarshal([]byte(event.Body), &body); err != nil {
+		return app.RegisterReadingInput{}, errors.New("invalid request body")
 	}
 
-	var b body
-	if err := json.Unmarshal(raw, &b); err != nil {
-		return app.RegisterReadingInput{}, err
-	}
-
-	pagesVO, err := readingDomain.NewPages(b.Pages)
+	pagesVO, err := readingDomain.NewPages(body.Pages)
 	if err != nil {
-		return app.RegisterReadingInput{}, readingDomain.ErrInvalidPages
+		return app.RegisterReadingInput{}, err
 	}
 
 	return app.RegisterReadingInput{
-		Claims: meIn.Claims,
+		Claims: claims,
 		Pages:  pagesVO,
 	}, nil
 }

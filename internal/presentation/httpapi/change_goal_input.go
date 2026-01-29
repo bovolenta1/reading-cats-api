@@ -16,7 +16,8 @@ type changeGoalBody struct {
 }
 
 func BuildChangeGoalInput(event events.APIGatewayV2HTTPRequest) (app.ChangeGoalInput, error) {
-	authInput, err := BuildEnsureMeInput(event)
+	// Extract Claims from event
+	claims, err := ExtractClaims(event)
 	if err != nil {
 		return app.ChangeGoalInput{}, err
 	}
@@ -37,7 +38,7 @@ func BuildChangeGoalInput(event events.APIGatewayV2HTTPRequest) (app.ChangeGoalI
 	}
 
 	return app.ChangeGoalInput{
-		CognitoSub: string(authInput.Claims.Sub),
-		Pages:      pages,
+		Claims: claims,
+		Pages:  pages,
 	}, nil
 }

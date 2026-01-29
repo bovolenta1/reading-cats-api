@@ -28,6 +28,9 @@ func (h *ChangeGoalHandler) Handle(ctx context.Context, event events.APIGatewayV
 
 	out, err := h.uc.Execute(ctx, in)
 	if err != nil {
+		if err == app.ErrUserNotFound {
+			return Error(event, http.StatusNotFound, "user not found"), nil
+		}
 		return Error(event, http.StatusInternalServerError, err.Error()), nil
 	}
 

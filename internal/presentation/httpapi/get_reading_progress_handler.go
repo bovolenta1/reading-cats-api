@@ -26,6 +26,9 @@ func (h *GetReadingProgressHandler) Handle(ctx context.Context, event events.API
 
 	out, err := h.uc.Execute(ctx, in)
 	if err != nil {
+		if err == app.ErrUserNotFound {
+			return Error(event, http.StatusNotFound, "user not found"), nil
+		}
 		log.Printf("reading.progress error request_id=%s err=%v", event.RequestContext.RequestID, err)
 		return Error(event, http.StatusInternalServerError, "internal error"), nil
 	}

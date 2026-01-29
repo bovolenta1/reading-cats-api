@@ -15,6 +15,57 @@ import (
 
 var ErrUnauthorized = errors.New("unauthorized")
 
+// ExtractClaims extrai IDPClaims direto do evento (sem criar app.Input).
+// Funciona tanto em PROD (API Gateway JWT Authorizer) quanto em DEV (SAM local).
+func ExtractClaims(event events.APIGatewayV2HTTPRequest) (domain.IDPClaims, error) {
+	// 1) PROD: claims do API Gateway JWT Authorizer (quando existir)
+	if event.RequestContext.Authorizer != nil && event.RequestContext.Authorizer.JWT != nil {
+		c := event.RequestContext.Authorizer.JWT.Claims
+
+		sub := strings.TrimSpace(c["sub"])
+		if sub != "" {
+			name := strings.TrimSpace(c["name"])
+			if name == "" {
+				name = strings.TrimSpace(joinName(c["given_name"], c["family_name"]))
+			}
+
+			return buildIDPClaims(
+				sub,
+				strings.TrimSpace(c["email"]),
+				name,
+				strings.TrimSpace(c["picture"]),
+			)
+		}
+	}
+
+	// 2) SAM local: fallback decodificando o JWT do Authorization header
+	if os.Getenv("AWS_SAM_LOCAL") == "true" {
+		token := bearerToken(event.Headers)
+		if token == "" {
+			return domain.IDPClaims{}, ErrUnauthorized
+		}
+
+		p, ok := decodeJwtPayload(token)
+		if !ok || strings.TrimSpace(p.Sub) == "" {
+			return domain.IDPClaims{}, ErrUnauthorized
+		}
+
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			name = strings.TrimSpace(joinName(p.GivenName, p.FamilyName))
+		}
+
+		return buildIDPClaims(
+			p.Sub,
+			p.Email,
+			name,
+			p.Picture,
+		)
+	}
+
+	return domain.IDPClaims{}, ErrUnauthorized
+}
+
 type jwtPayload struct {
 	Sub        string `json:"sub"`
 	Email      string `json:"email"`

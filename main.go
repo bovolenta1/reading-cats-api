@@ -38,9 +38,9 @@ func init() {
 
 	// reading/logs
 	readingRepo := infraReading.NewPostgresRepository(pool)
-	readingUC := appReading.NewRegisterReadingUseCase(readingRepo, "America/Sao_Paulo")
-	getReadingProgressUC := appReading.NewGetReadingProgressUseCase(readingRepo, "America/Sao_Paulo")
-	changeGoalUC := appReading.NewChangeGoalUseCase(readingRepo, "America/Sao_Paulo")
+	readingUC := appReading.NewRegisterReadingUseCase(readingRepo, userRepo, "America/Sao_Paulo")
+	getReadingProgressUC := appReading.NewGetReadingProgressUseCase(readingRepo, userRepo, "America/Sao_Paulo")
+	changeGoalUC := appReading.NewChangeGoalUseCase(readingRepo, userRepo, "America/Sao_Paulo")
 	registerReadingHandler := httpReading.NewRegisterReadingHandler(readingUC)
 	getReadingProgressHandler := httpReading.NewGetReadingProgressHandler(getReadingProgressUC)
 	changeGoalHandler := httpReading.NewChangeGoalHandler(changeGoalUC)

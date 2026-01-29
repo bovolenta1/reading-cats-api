@@ -1,10 +1,13 @@
 package reading
 
-import readingDomain "reading-cats-api/internal/domain/reading"
+import (
+	readingDomain "reading-cats-api/internal/domain/reading"
+	userDomain "reading-cats-api/internal/domain/user"
+)
 
 type ChangeGoalInput struct {
-	CognitoSub string
-	Pages      readingDomain.Pages
+	Claims userDomain.IDPClaims
+	Pages  readingDomain.Pages
 }
 
 type ChangeGoalOutput struct {

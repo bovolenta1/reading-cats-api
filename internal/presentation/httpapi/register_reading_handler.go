@@ -28,6 +28,9 @@ func (h *RegisterReadingHandler) Handle(ctx context.Context, event events.APIGat
 
 	out, err := h.uc.Execute(ctx, in)
 	if err != nil {
+		if err == app.ErrUserNotFound {
+			return Error(event, http.StatusNotFound, "user not found"), nil
+		}
 		return Error(event, http.StatusBadRequest, err.Error()), nil
 	}
 

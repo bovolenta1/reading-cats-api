@@ -7,11 +7,13 @@ import (
 )
 
 func BuildGetReadingProgressInput(event events.APIGatewayV2HTTPRequest) (app.GetReadingProgressInput, error) {
-	meIn, err := BuildEnsureMeInput(event)
+	// Extract Claims from event
+	claims, err := ExtractClaims(event)
 	if err != nil {
 		return app.GetReadingProgressInput{}, err
 	}
+
 	return app.GetReadingProgressInput{
-		Claims: meIn.Claims,
+		Claims: claims,
 	}, nil
 }
