@@ -1,5 +1,5 @@
 -- Create enums
-CREATE TYPE group_visibility AS ENUM ('INVITE_ONLY', 'PUBLIC_SOON');
+CREATE TYPE group_visibility AS ENUM ('INVITE_ONLY', 'PUBLIC_SOON', 'FOUNDERS');
 CREATE TYPE group_member_role AS ENUM ('ADMIN', 'MEMBER');
 CREATE TYPE group_season_status AS ENUM ('DRAFT', 'ACTIVE', 'ENDED');
 CREATE TYPE group_metric AS ENUM ('CHECKINS_PER_DAY', 'PAGES_SOON', 'MINUTES_SOON');

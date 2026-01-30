@@ -1,0 +1,1 @@
+ALTER TABLE groups ADD COLUMN max_members int NOT NULL DEFAULT 10;

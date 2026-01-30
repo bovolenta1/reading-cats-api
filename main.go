@@ -5,11 +5,15 @@ import (
 	"log"
 	"os"
 
+	appGroup "reading-cats-api/internal/application/group"
 	appReading "reading-cats-api/internal/application/reading"
+	appSeason "reading-cats-api/internal/application/season"
 	appUser "reading-cats-api/internal/application/user"
 	"reading-cats-api/internal/config"
 	"reading-cats-api/internal/infra/db"
+	infraGroup "reading-cats-api/internal/infra/group"
 	infraReading "reading-cats-api/internal/infra/reading"
+	infraSeason "reading-cats-api/internal/infra/season"
 	infraUser "reading-cats-api/internal/infra/user"
 	"reading-cats-api/internal/presentation/httpapi"
 	httpReading "reading-cats-api/internal/presentation/httpapi"
@@ -45,7 +49,17 @@ func init() {
 	getReadingProgressHandler := httpReading.NewGetReadingProgressHandler(getReadingProgressUC)
 	changeGoalHandler := httpReading.NewChangeGoalHandler(changeGoalUC)
 
-	router = httpapi.NewRouter(meHandler, registerReadingHandler, getReadingProgressHandler, changeGoalHandler)
+	// group/create
+	groupRepo := infraGroup.NewPostgresRepository(pool)
+	createGroupUC := appGroup.NewCreateGroupUseCase(groupRepo, userRepo)
+	createGroupHandler := httpapi.NewCreateGroupHandler(createGroupUC)
+
+	// season/create
+	seasonRepo := infraSeason.NewPostgresRepository(pool)
+	createSeasonUC := appSeason.NewCreateSeasonUseCase(seasonRepo, userRepo)
+	createSeasonHandler := httpapi.NewCreateSeasonHandler(createSeasonUC)
+
+	router = httpapi.NewRouter(meHandler, registerReadingHandler, getReadingProgressHandler, changeGoalHandler, createGroupHandler, createSeasonHandler)
 }
 
 func handler(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {

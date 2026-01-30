@@ -37,6 +37,8 @@ Este documento guia o desenvolvimento e manutenção da **Reading Cats API**, um
 GET  /v1/me                   → Usuário autenticado (me)
 POST /v1/reading/logs         → Registrar leitura diária
 GET  /v1/reading/progress     → Progresso de leitura
+PUT  /v1/reading/goal         → Alterar meta de leitura
+POST /v1/groups               → Criar novo grupo
 ```
 
 ---
@@ -92,24 +94,37 @@ reading-cats-api/
 │   │   │   ├── value_objects.go     # CognitoSub, Email, DisplayName, etc.
 │   │   │   ├── errors.go            # Erros de domínio do usuário
 │   │   │
-│   │   └── reading/
-│   │       ├── progress.go          # Lógica de progresso de leitura
-│   │       ├── value_objects.go     # LocalDate, Pages, etc.
-│   │       └── errors.go            # Erros de domínio de leitura
+│   │   ├── reading/
+│   │   │   ├── progress.go          # Lógica de progresso de leitura
+│   │   │   ├── value_objects.go     # LocalDate, Pages, etc.
+│   │   │   └── errors.go            # Erros de domínio de leitura
+│   │   │
+│   │   └── group/
+│   │       ├── group.go             # Entidade Group
+│   │       ├── value_objects.go     # GroupName, IconID, Visibility
+│   │       └── errors.go            # Erros de domínio de grupo
 │   │
 │   ├── application/                 # APPLICATION LAYER (use cases)
 │   │   ├── user/
 │   │   │   ├── ensure_me.go         # UseCase: encontrar ou criar usuário
-│   │   │   ├── dto.go               # DTOs (MeDTO, Input)
+│   │   │   ├── dto.go               # DTOs (Input/Output)
 │   │   │   └── repository.go        # Interface do repositório
 │   │   │
-│   │   └── reading/
-│   │       ├── register_reading.go  # UseCase: registrar leitura
-│   │       ├── get_reading_progress.go
-│   │       ├── dto.go
-│   │       └── repository.go
-│   │
-│   ├── infra/                       # INFRASTRUCTURE LAYER
+│   │   ├── reading/
+│   │   │   ├── register_reading.go  # UseCase: registrar leitura
+│   │   │   ├── get_reading_progress.go
+│   │   │   ├── change_goal.go       # UseCase: alterar meta
+│   │   │   ├── dto.go               # DTOs (Input/Output)
+│   │   │   └── repository.go
+│   │   │
+│   │   └── group/
+│   │       ├── create_group.go      # UseCase: criar grupo
+│   │       ├── dto.go               # DTOs (Input/Output)
+│   │       └── repository.go        # Interface do repositório
+│   │├── reading/
+│   │   │   └── postgres_repository.go # Implementação do repo de reading
+│   │   └── group/
+│   │       └── postgres_repository.go # Implementação do repo de grupo
 │   │   ├── db/
 │   │   │   └── postgres.go          # Pool de conexões Postgres
 │   │   ├── user/
@@ -121,16 +136,30 @@ reading-cats-api/
 │   │   └── httpapi/
 │   │       ├── router.go            # Roteamento principal
 │   │       ├── auth_claims.go       # Extração de JWT
-│   │       ├── response.go          # Helpers JSON/Error
-│   │       ├── me_handler.go        # Handler: GET /v1/me
+│   │       ├── me_input.go
 │   │       ├── register_reading_handler.go
-│   │       ├── get_reading_progress_handler.go
 │   │       ├── register_reading_input.go
+│   │       ├── get_reading_progress_handler.go
+│   │       ├── get_reading_progress_input.go
+│   │       ├── change_goal_handler.go
+│   │       ├── change_goal_input.go
+│   │       ├── create_group_handler.go      # Handler: POST /v1/groups
+│   │       └── create_group_inputading_input.go
 │   │       ├── get_reading_progress_input.go
 │   │       └── auth_claims.go
 │   │
 │   └── config/
-│       └── config.go                # Variáveis de ambiente
+│   ├── 000002_create_reading_tables.down.sql
+│   ├── 000003_add_valid_from_to_reading_goal.up.sql
+│   ├── 000003_add_valid_from_to_reading_goal.down.sql
+│   ├── 000004_switch_to_uuid_keys.up.sql
+│   ├── 000004_switch_to_uuid_keys.down.sql
+│   ├── 000005_rename_reading_day_to_user_checkins.up.sql
+│   ├── 000005_rename_reading_day_to_user_checkins.down.sql
+│   ├── 000006_create_groups_schema.up.sql
+│   ├── 000006_create_groups_schema.down.sql
+│   ├── 000007_alter_group_seasons_table.up.sql
+│   └── 000007_alter_group_seasons_table # Variáveis de ambiente
 │
 ├── migrations/                      # SQL migrations (golang-migrate)
 │   ├── 000001_create_user.up.sql
@@ -666,6 +695,64 @@ func (r *PostgresRepository) AddPages(ctx context.Context, tx pgx.Tx, subID stri
 - ❌ Nunca acesse DB diretamente
 - ❌ Nunca valide ou processe lógica de domínio aqui
 
+#### Padrão: BuildInput + Claims
+
+**O `BuildInput` sempre:**
+1. Extrai claims com `ExtractClaims(event)`
+2. Parseia o body JSON
+3. Retorna o DTO da application layer (que já contém as claims)
+
+**Exemplo correto** (`register_reading_input.go`):
+```go
+type registerReadingBody struct {
+	Pages int `json:"pages"`
+}
+
+func BuildRegisterReadingInput(event events.APIGatewayV2HTTPRequest) (app.RegisterReadingInput, error) {
+	// Extract Claims from event
+	claims, err := ExtractClaims(event)
+	if err != nil {
+		return app.RegisterReadingInput{}, err
+	}
+
+	// Parse body
+	var body registerReadingBody
+	if err := json.Unmarshal([]byte(event.Body), &body); err != nil {
+		return app.RegisterReadingInput{}, errors.New("invalid request body")
+	}
+
+	pagesVO, err := readingDomain.NewPages(body.Pages)
+	if err != nil {
+		return app.RegisterReadingInput{}, err
+	}
+
+	return app.RegisterReadingInput{
+		Claims: claims,
+		Pages:  pagesVO,
+	}, nil
+}
+```
+
+**E o handler fica simples:**
+```go
+func (h *RegisterReadingHandler) Handle(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	// 1. Parse input (claims já incluídas)
+	in, err := BuildRegisterReadingInput(event)
+	if err != nil {
+		return Error(event, http.StatusBadRequest, err.Error()), nil
+	}
+
+	// 2. Chamar use case
+	out, err := h.uc.Execute(ctx, in)
+	if err != nil {
+		return Error(event, http.StatusInternalServerError, err.Error()), nil
+	}
+
+	// 3. Retornar
+	return JSON(http.StatusOK, out), nil
+}
+```
+
 **Exemplo:**
 ```go
 // presentation/httpapi/register_reading_handler.go
@@ -689,6 +776,7 @@ func (h *RegisterReadingHandler) Handle(ctx context.Context, event events.APIGat
     // 3. Chamar use case
     out, err := h.uc.Execute(ctx, in)
     if err != nil {
+
         return Error(event, http.StatusInternalServerError, err.Error()), nil
     }
     
@@ -779,6 +867,22 @@ curl -X POST http://localhost:3000/v1/reading/logs \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"pages": 20}'
+
+# GET /v1/reading/progress
+curl -X GET http://localhost:3000/v1/reading/progress \
+  -H "Authorization: Bearer <token>"
+
+# PUT /v1/reading/goal
+curl -X PUT http://localhost:3000/v1/reading/goal \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"pages": 100}'
+
+# POST /v1/groups (criar novo grupo)
+curl -X POST http://localhost:3000/v1/groups \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "React Lovers", "icon_id": "books"}'
 ```
 
 ### Variáveis de Ambiente
@@ -827,6 +931,66 @@ TIMEZONE=America/Sao_Paulo
 
 ---
 
+## ✅ Exemplo Prático: POST /v1/groups
+
+### Estrutura Criada:
+
+**Domain Layer** (`internal/domain/group/`)
+- `group.go` → Entidade `Group` com construtor `New()`
+- `value_objects.go` → VOs: `GroupName`, `IconID`, `Visibility` (com validação)
+- `errors.go` → Erros: `ErrInvalidGroupName`, `ErrInvalidIconID`
+
+**Application Layer** (`internal/application/group/`)
+- `dto.go` → `CreateGroupInput` (contém `Claims` + dados do corpo), `CreateGroupOutput`
+- `create_group.go` → `CreateGroupUseCase` que:
+  - Busca o usuário pelo `CognitoSub` usando `userRepo.FindByCognitoSub(in.Claims.Sub)`
+  - Obtém o `user.ID` (UUID) para usar como `CreatedByUserID`
+  - Valida entrada (name, icon_id)
+  - Cria entidade `Group` com visibility = INVITE_ONLY
+  - Insere no DB
+  - Adiciona creator como ADMIN em `group_members`
+  - Recebe injeção de dependência: `groupRepo` + `userRepo`
+- `repository.go` → Interface com `Insert()` e `AddMember()`
+
+**Infrastructure Layer** (`internal/infra/group/`)
+- `postgres_repository.go` → Implementação com queries diretos ao Postgres
+
+**Presentation Layer** (`internal/presentation/httpapi/`)
+- `create_group_input.go` → `BuildCreateGroupInput()` que:
+  - Extrai claims com `ExtractClaims()`
+  - Parseia body JSON
+  - Retorna `app.CreateGroupInput` (já com claims)
+- `create_group_handler.go` → Handler simples que recebe input pronto
+- `router.go` → Rota `POST /v1/groups` adicionada
+- `main.go` → Dependency injection com pool → repo → UC → handler
+
+### Request:
+```bash
+POST /v1/groups
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "React Lovers",
+  "icon_id": "books"
+}
+```
+
+### Response (201 Created):
+```json
+{
+  "id": "uuid-xxx",
+  "name": "React Lovers",
+  "icon_id": "books",
+  "visibility": "INVITE_ONLY",
+  "created_by_user_id": "uuid-yyy",
+  "created_at": "2026-01-29T10:00:00Z",
+  "updated_at": "2026-01-29T10:00:00Z"
+}
+```
+
+---
+
 ## 📝 Resumo: Do Simples ao Complexo
 
 ### Fluxo de Desenvolvimento Típico:
@@ -839,6 +1003,7 @@ TIMEZONE=America/Sao_Paulo
    - Defina `domain/book/errors.go` (erros específicos)
 
 3. **Application:**
+
    - Defina `application/book/repository.go` (interface)
    - Implemente `application/book/list_books.go` (use case)
    - Defina `application/book/dto.go` (Input/Output)
